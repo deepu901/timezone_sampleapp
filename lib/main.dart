@@ -233,7 +233,7 @@ class _TimeZoneSelectionScreenState extends State<TimeZoneSelectionScreen> {
         'Australia/Darwin'
       ];
     }
-    // Add other regions and their time zones as needed
+    //Still to add other regions and their time zones as needed
     return [];
   }
 }
