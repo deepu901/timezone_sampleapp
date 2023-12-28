@@ -6,11 +6,10 @@ import 'package:timezone/data/latest.dart' as tz;
 void main() async {
   // Initialize the time zone database
   tz.initializeTimeZones();
-  runApp(const MyApp());
+  runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -18,42 +17,63 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: const MyHomePage(),
+      home: MyHomePage(),
     );
   }
 }
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key});
   @override
   _MyHomePageState createState() => _MyHomePageState();
 }
 
 class _MyHomePageState extends State<MyHomePage> {
   String selectedRegion = "Australia";
-  String selectedTimeZone = "Australia/Adelaide";
+  String selectedTimeZone = "Australia/Sydney";
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Time Zone App'),
+        title: Text('Time Zone App'),
       ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            const Text(
-              'Currently Selected Time Zone:',
-              style: TextStyle(fontSize: 18),
+            FutureBuilder<Map<String, String>>(
+              future: _getCurrentTime(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return CircularProgressIndicator();
+                } else if (snapshot.hasError) {
+                  return Text('Error: ${snapshot.error}');
+                } else {
+                  return Column(
+                    children: [
+                      Text(
+                        '${snapshot.data!['selectedTimeZoneTime']}',
+                        style: TextStyle(
+                            fontSize: 24, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: 10),
+                      Text(
+                        '${snapshot.data!['gmtTime']}',
+                        style: TextStyle(fontSize: 18),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  );
+                }
+              },
             ),
-            const SizedBox(height: 10),
+            SizedBox(height: 20),
             GestureDetector(
               onTap: () async {
                 // Navigate to sub-view to set region and time zone
                 final result = await _navigateToTimeZoneSelection(context);
-
-// Update the selected region and time zone when the sub-view is closed
+                // Update the selected region and time zone when the sub-view is closed
                 if (result != null &&
                     result.containsKey('region') &&
                     result.containsKey('timeZone')) {
@@ -63,22 +83,12 @@ class _MyHomePageState extends State<MyHomePage> {
                   });
                 }
               },
-              child: FutureBuilder<String>(
-                future: _getCurrentTime(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const CircularProgressIndicator();
-                  } else if (snapshot.hasError) {
-                    return Text('Error: ${snapshot.error}');
-                  } else {
-                    return Text(
-                      '$selectedRegion\n$selectedTimeZone\n${snapshot.data}',
-                      style: const TextStyle(
-                          fontSize: 24, fontWeight: FontWeight.bold),
-                      textAlign: TextAlign.center,
-                    );
-                  }
-                },
+              child: Text(
+                'Change Time Zone',
+                style: TextStyle(
+                  color: Colors.blue,
+                  decoration: TextDecoration.underline,
+                ),
               ),
             ),
           ],
@@ -98,13 +108,31 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  // Function to get the current time in the selected time zone
-  Future<String> _getCurrentTime() async {
+  // Function to get the current time in the selected time zone and GMT
+  Future<Map<String, String>> _getCurrentTime() async {
     final location = tz.getLocation(selectedTimeZone);
     final now = tz.TZDateTime.now(location);
+    final gmtNow = tz.TZDateTime.now(tz.UTC);
+
+    // Get the time zone offset
+    final timeZoneOffset = now.timeZoneOffset;
+    final gmtOffset = gmtNow.timeZoneOffset;
+
+    // Format the offset as "GMT+HH:mm"
+    final timeZoneOffsetString =
+        '${timeZoneOffset.isNegative ? 'GMT' : 'GMT+'}${timeZoneOffset.inHours}:${(timeZoneOffset.inMinutes % 60).abs().toString().padLeft(2, '0')}';
+
     final formatter = DateFormat.yMd().add_Hms();
-    final formattedTime = formatter.format(now);
-    return 'Current Date and Time:\n$formattedTime';
+
+    final formattedTimeZoneTime =
+        '${formatter.format(now)} $timeZoneOffsetString ${location.name}';
+    final formattedGMTTime =
+        '${formatter.format(gmtNow)} GMT${gmtOffset.isNegative ? '-' : '+'}${gmtOffset.inHours.abs().toString().padLeft(2, '0')}:${(gmtOffset.inMinutes % 60).abs().toString().padLeft(2, '0')}';
+
+    return {
+      'selectedTimeZoneTime': 'Current Date and Time:\n$formattedTimeZoneTime',
+      'gmtTime': 'GMT Time:\n$formattedGMTTime',
+    };
   }
 }
 
@@ -134,16 +162,13 @@ class _TimeZoneSelectionScreenState extends State<TimeZoneSelectionScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Select Time Zone'),
+        title: Text('Select Time Zone'),
       ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            // Add widgets for selecting region and time zone
-            // For simplicity, you can use DropdownButton or other widgets
-            const Text('Select Region:'),
-            // Add widgets for region selection
+            Text('Select Region:'),
             DropdownButton<String>(
               value: selectedRegion,
               onChanged: (value) {
@@ -154,18 +179,15 @@ class _TimeZoneSelectionScreenState extends State<TimeZoneSelectionScreen> {
               items: [
                 'Australia',
                 // Add other regions as needed
-              ].map<DropdownMenuItem<String>>((String value) {
+              ].map((String value) {
                 return DropdownMenuItem<String>(
                   value: value,
                   child: Text(value),
                 );
               }).toList(),
             ),
-
-            const SizedBox(height: 20),
-
-            const Text('Select Time Zone:'),
-            // Add widgets for time zone selection
+            SizedBox(height: 20),
+            Text('Select Time Zone:'),
             DropdownButton<String>(
               value: selectedTimeZone,
               onChanged: (value) {
@@ -173,24 +195,21 @@ class _TimeZoneSelectionScreenState extends State<TimeZoneSelectionScreen> {
                   selectedTimeZone = value!;
                 });
               },
-              items: _getTimeZonesForRegion(selectedRegion)
-                  .map<DropdownMenuItem<String>>((String value) {
+              items: _getTimeZonesForRegion(selectedRegion).map((String value) {
                 return DropdownMenuItem<String>(
                   value: value,
                   child: Text(value),
                 );
               }).toList(),
             ),
-
-            const SizedBox(height: 20),
-
+            SizedBox(height: 20),
             ElevatedButton(
               onPressed: () {
                 // Pass selected region and time zone back to the main screen
                 Navigator.pop(context,
                     {'region': selectedRegion, 'timeZone': selectedTimeZone});
               },
-              child: const Text('Save'),
+              child: Text('Save'),
             ),
           ],
         ),
@@ -202,12 +221,7 @@ class _TimeZoneSelectionScreenState extends State<TimeZoneSelectionScreen> {
     // Add logic to fetch time zones based on the selected region
     // For simplicity, return a predefined list
     if (region == 'Australia') {
-      return [
-        'Australia/Sydney',
-        'Australia/Melbourne',
-        'Australia/Brisbane',
-        'Australia/Adelaide'
-      ];
+      return ['Australia/Sydney', 'Australia/Melbourne', 'Australia/Brisbane'];
     }
     // Add other regions and their time zones as needed
     return [];
